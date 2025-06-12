@@ -1,158 +1,78 @@
 // src/hooks/useGeolocation.ts
 import { useState, useCallback } from 'react';
-import type { GeolocationPosition, IPLocationResponse } from '../types';
+import type { GeolocationPosition } from '../types';
+import { getCurrentLocation } from '../utils/locationUtils';
 
-export const useGeolocation = () => {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+interface UseGeolocationReturn {
+  getCurrentPosition: () => Promise<GeolocationPosition>;
+  isLoading: boolean;
+  error: string | null;
+  clearError: () => void;
+  requestPermission: () => Promise<boolean>;
+}
 
-    const getIPLocation = async (): Promise<GeolocationPosition> => {
-        try {
-            const response = await fetch('https://ipapi.co/json/');
-            
-            if (!response.ok) {
-                throw new Error('IP location service unavailable');
-            }
-            
-            const data: IPLocationResponse = await response.json();
+export const useGeolocation = (): UseGeolocationReturn => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-            // Validate the response
-            if (!data.latitude || !data.longitude) {
-                throw new Error('Invalid location data received');
-            }
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
-            return {
-                latitude: data.latitude,
-                longitude: data.longitude,
-                accuracy: 10000, // IP-based location is less accurate
-                timestamp: new Date(),
-                source: 'ip'
-            };
-        } catch (error) {
-            console.error('IP location error:', error);
-            throw new Error('Failed to get IP location');
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      // Check if permissions API is available
+      if ('permissions' in navigator) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        
+        if (permission.state === 'granted') {
+          return true;
+        } else if (permission.state === 'prompt') {
+          // Will be prompted when getCurrentPosition is called
+          return true;
+        } else {
+          setError('Akses lokasi ditolak secara permanen. Silakan aktifkan di pengaturan browser.');
+          return false;
         }
-    };
+      }
+      
+      // Fallback for browsers without permissions API
+      return true;
+    } catch (err) {
+      console.error('Permission check failed:', err);
+      return true; // Assume permission available
+    }
+  }, []);
 
-    const getCurrentPosition = useCallback((): Promise<GeolocationPosition> => {
-        setLoading(true);
-        setError(null);
+  const getCurrentPosition = useCallback(async (): Promise<GeolocationPosition> => {
+    setIsLoading(true);
+    setError(null);
 
-        return new Promise((resolve, reject) => {
-            if (!navigator.geolocation) {
-                console.warn('Geolocation not supported, using IP location');
-                getIPLocation()
-                    .then((position) => {
-                        setLoading(false);
-                        resolve(position);
-                    })
-                    .catch((error) => {
-                        setLoading(false);
-                        setError('Geolocation not supported and IP location failed');
-                        reject(error);
-                    });
-                return;
-            }
+    try {
+      // First check permission
+      const hasPermission = await requestPermission();
+      if (!hasPermission) {
+        throw new Error('Akses lokasi tidak diizinkan');
+      }
 
-            const timeoutId = setTimeout(() => {
-                setError('Location request timed out');
-                reject(new Error('Location request timed out'));
-            }, 15000);
+      // Get current location with enhanced fallback
+      const position = await getCurrentLocation();
+      
+      setIsLoading(false);
+      return position;
+    } catch (err) {
+      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'Gagal mendapatkan lokasi';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }, [requestPermission]);
 
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    clearTimeout(timeoutId);
-                    setLoading(false);
-                    
-                    resolve({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: position.coords.accuracy,
-                        timestamp: new Date(),
-                        source: 'gps'
-                    });
-                },
-                (error) => {
-                    clearTimeout(timeoutId);
-                    console.warn('GPS failed, trying IP location:', error.message);
-                    
-                    // More specific error handling
-                    let errorMessage = 'Failed to get GPS location';
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied by user';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location information unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timed out';
-                            break;
-                    }
-                    
-                    // Fallback to IP location
-                    getIPLocation()
-                        .then((ipLocation) => {
-                            setLoading(false);
-                            console.info('Using IP location as fallback');
-                            resolve(ipLocation);
-                        })
-                        .catch((_ipError) => {
-                            setLoading(false);
-                            setError(`${errorMessage}. IP location also failed.`);
-                            reject(new Error(`GPS and IP location both failed: ${errorMessage}`));
-                        });
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 12000,
-                    maximumAge: 300000 // 5 minutes
-                }
-            );
-        });
-    }, []);
-
-    const watchPosition = useCallback((callback: (position: GeolocationPosition) => void) => {
-        if (!navigator.geolocation) {
-            setError('Geolocation not supported');
-            return null;
-        }
-
-        const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                callback({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy,
-                    timestamp: new Date(),
-                    source: 'gps'
-                });
-            },
-            (error) => {
-                console.error('Watch position error:', error);
-                setError('Failed to watch position');
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 60000
-            }
-        );
-
-        return watchId;
-    }, []);
-
-    const clearWatch = useCallback((watchId: number) => {
-        if (navigator.geolocation) {
-            navigator.geolocation.clearWatch(watchId);
-        }
-    }, []);
-
-    return {
-        getCurrentPosition,
-        watchPosition,
-        clearWatch,
-        loading,
-        error
-    };
+  return {
+    getCurrentPosition,
+    isLoading,
+    error,
+    clearError,
+    requestPermission
+  };
 };

