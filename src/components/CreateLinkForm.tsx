@@ -1,4 +1,3 @@
-// src/components/CreateLinkForm.tsx
 import React, { useState } from "react";
 import type { TrackingLink } from "../types";
 import { generateSecureTrackingLink, createTrackingUrl } from "../utils/linkGenerator";
@@ -46,31 +45,35 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
 
   const copyLink = async () => {
     try {
+      // Modern way to copy to clipboard
       await navigator.clipboard.writeText(generatedLink);
       setCopying(true);
       setTimeout(() => setCopying(false), 2000);
     } catch (err) {
-      // Fallback for older browsers
+      // Fallback for older browsers or if clipboard API is not available/denied
       const textArea = document.createElement("textarea");
       textArea.value = generatedLink;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
+      textArea.style.position = "fixed"; // Prevents scrolling to bottom
+      textArea.style.opacity = "0"; // Make it invisible
       document.body.appendChild(textArea);
-      textArea.select();
+      textArea.focus();
+      textArea.select(); // Select the text
+
       try {
-        document.execCommand("copy");
+        document.execCommand("copy"); // Execute copy command
         setCopying(true);
         setTimeout(() => setCopying(false), 2000);
       } catch (copyErr) {
         alert("Gagal copy link. Silakan copy manual.");
       } finally {
-        document.body.removeChild(textArea);
+        document.body.removeChild(textArea); // Clean up the textarea
       }
     }
   };
 
   const shareLink = async () => {
-    if (navigator.share) {
+    // Correctly check if navigator.share is a function before calling it
+    if (typeof navigator.share === "function") {
       try {
         await navigator.share({
           title: `Location Tracker - ${targetName}`,
@@ -82,7 +85,7 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
         console.log("Sharing cancelled or failed:", err);
       }
     } else {
-      // Fallback to copying
+      // Fallback to copying if Web Share API is not available
       copyLink();
     }
   };
@@ -103,8 +106,11 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nama Target:</label>
+          <label htmlFor="target-name" className="block text-sm font-medium text-gray-700 mb-2">
+            Nama Target:
+          </label>
           <input
+            id="target-name" // Added id for better accessibility
             type="text"
             value={targetName}
             onChange={(e) => setTargetName(e.target.value)}
@@ -184,7 +190,7 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
               </div>
 
               {/* Share button for mobile devices */}
-              {navigator.share && (
+              {typeof navigator.share === "function" && ( // Updated condition here
                 <button
                   onClick={shareLink}
                   className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-300"
@@ -194,9 +200,7 @@ const CreateLinkForm: React.FC<CreateLinkFormProps> = ({ onLinkCreated }) => {
               )}
 
               <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                <p className="text-xs text-blue-700 mb-2">
-                  💡 <strong>Cara Penggunaan:</strong>
-                </p>
+                <p className="text-xs text-blue-700 mb-2">💡 **Cara Penggunaan:**</p>
                 <ul className="text-xs text-blue-600 space-y-1">
                   <li>• Bagikan link ini ke target yang ingin ditrack</li>
                   <li>• Ketika mereka membuka link, lokasi akan terdeteksi otomatis</li>

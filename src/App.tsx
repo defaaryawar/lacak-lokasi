@@ -23,7 +23,7 @@ function App() {
   const [currentTarget, setCurrentTarget] = useState<string | null>(null);
 
   // Custom Hooks
-  const { getCurrentPosition, loading } = useGeolocation();
+  const { getCurrentPosition } = useGeolocation();
 
   // Calculate stats
   const stats: StatsData = {

@@ -1,6 +1,6 @@
 // src/components/MapComponent.tsx
 
-import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useImperativeHandle, forwardRef } from "react";
 import type { LocationData } from "../types";
 
 interface MapComponentProps {
@@ -16,8 +16,6 @@ interface MapComponentRef {
 const MapComponent = forwardRef<MapComponentRef, MapComponentProps>(
   ({ locations, onLocationFocus, focusedLocationId }, ref) => {
     const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
-    const mapContainerRef = useRef<HTMLDivElement>(null);
-
     // Expose focusOnLocation method via ref
     useImperativeHandle(ref, () => ({
       focusOnLocation: (locationId: string) => {

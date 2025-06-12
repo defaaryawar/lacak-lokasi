@@ -97,7 +97,7 @@ export const useGeolocation = () => {
                             console.info('Using IP location as fallback');
                             resolve(ipLocation);
                         })
-                        .catch((ipError) => {
+                        .catch((_ipError) => {
                             setLoading(false);
                             setError(`${errorMessage}. IP location also failed.`);
                             reject(new Error(`GPS and IP location both failed: ${errorMessage}`));
