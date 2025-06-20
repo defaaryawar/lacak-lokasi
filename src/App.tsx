@@ -24,7 +24,40 @@ function App() {
   const [isProcessingLocation, setIsProcessingLocation] = useState(false);
 
   // Custom Hooks
-  const { getCurrentPosition, isLoading: geoLoading, error: geoError, clearError } = useGeolocation();
+  const {
+    getCurrentPosition,
+    isLoading: geoLoading,
+    error: geoError,
+    clearError,
+  } = useGeolocation();
+
+  useEffect(() => {
+    console.log("=== DEBUG: Checking for tracking parameters ===");
+    console.log("Current URL:", window.location.href);
+    console.log("Pathname:", window.location.pathname);
+    console.log("Search params:", window.location.search);
+
+    const { trackId, name } = parseTrackingParams();
+    console.log("Parsed tracking params:", { trackId, name });
+    console.log("isProcessingLocation:", isProcessingLocation);
+
+    if (trackId && name && !isProcessingLocation) {
+      console.log("✅ Found tracking parameters, processing...");
+
+      // Small delay to ensure UI is ready
+      setTimeout(() => {
+        console.log("⏰ Starting location processing...");
+        processLocationTracking(name, trackId);
+      }, 1000);
+    } else {
+      console.log("❌ No valid tracking parameters found or already processing");
+      console.log("Conditions:", {
+        hasTrackId: !!trackId,
+        hasName: !!name,
+        isNotProcessing: !isProcessingLocation,
+      });
+    }
+  }, []);
 
   // Calculate stats
   const stats: StatsData = {
@@ -38,97 +71,112 @@ function App() {
     setTrackingLinks((prev) => [...prev, newLink]);
   };
 
-  // Process location tracking with better error handling
   const processLocationTracking = async (targetName: string, trackId: string) => {
-    if (isProcessingLocation) return; // Prevent duplicate processing
-    
+    console.log("=== DEBUG: processLocationTracking started ===");
+    console.log("Target:", targetName, "TrackID:", trackId);
+
+    if (isProcessingLocation) {
+      console.log("❌ Already processing, skipping...");
+      return;
+    }
+
     setIsProcessingLocation(true);
     setShowLocationModal(true);
     setCurrentTarget(targetName);
-    clearError(); // Clear any previous errors
+    clearError();
 
     try {
-      console.log(`Processing location for: ${targetName}`);
-      
+      console.log("🔍 Getting current position...");
+
       // Get current position with enhanced fallback
       const position = await getCurrentPosition();
-      console.log('Position obtained:', position);
-      
+      console.log("✅ Position obtained:", position);
+
       // Create location data
       const locationData = createLocationData(targetName, position);
-      console.log('Location data created:', locationData);
+      console.log("✅ Location data created:", locationData);
 
       // Add to locations
       setLocations((prev) => {
         const newLocations = [...prev, locationData];
-        console.log('Updated locations:', newLocations);
+        console.log("✅ Updated locations array:", newLocations);
+        console.log("Total locations now:", newLocations.length);
         return newLocations;
       });
 
       // Update link access status
-      setTrackingLinks((prev) =>
-        prev.map((link) => {
+      setTrackingLinks((prev) => {
+        const updatedLinks = prev.map((link) => {
           if (link.id === trackId) {
-            return { 
-              ...link, 
-              accessed: true, 
+            console.log("✅ Updating link:", link.id);
+            return {
+              ...link,
+              accessed: true,
               accessCount: (link.accessCount || 0) + 1,
-              lastAccessed: new Date()
+              lastAccessed: new Date(),
             };
           }
           return link;
-        })
-      );
+        });
+        console.log("✅ Updated links:", updatedLinks);
+        return updatedLinks;
+      });
 
-      console.log('Location tracking completed successfully');
-      
+      console.log("🎉 Location tracking completed successfully");
+
       // Show success message
       setTimeout(() => {
-        alert(`✅ Lokasi ${targetName} berhasil terdeteksi!\n\n` +
-              `📍 Koordinat: ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}\n` +
-              `🎯 Akurasi: ${position.accuracy}m\n` +
-              `📡 Sumber: ${position.source === 'gps' ? 'GPS' : 'IP Location'}`);
+        alert(
+          `✅ Lokasi ${targetName} berhasil terdeteksi!\n\n` +
+            `📍 Koordinat: ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}\n` +
+            `🎯 Akurasi: ${position.accuracy}m\n` +
+            `📡 Sumber: ${position.source === "gps" ? "GPS" : "IP Location"}`
+        );
       }, 1000);
-
     } catch (error) {
-      console.error("Failed to get location:", error);
-      
+      console.error("❌ Location tracking failed:", error);
+
       let errorMessage = "Gagal mendapatkan lokasi. ";
       if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
         errorMessage += error.message;
       } else {
         errorMessage += "Silakan coba lagi.";
       }
-      
+
       // Show error with instructions
-      alert(`❌ ${errorMessage}\n\n` +
-            `💡 Tips:\n` +
-            `• Pastikan browser mengizinkan akses lokasi\n` +
-            `• Aktifkan GPS/Location Services\n` +
-            `• Coba refresh halaman dan izinkan akses lokasi\n` +
-            `• Pastikan koneksi internet stabil`);
-      
+      alert(
+        `❌ ${errorMessage}\n\n` +
+          `💡 Tips:\n` +
+          `• Pastikan browser mengizinkan akses lokasi\n` +
+          `• Aktifkan GPS/Location Services\n` +
+          `• Coba refresh halaman dan izinkan akses lokasi\n` +
+          `• Pastikan koneksi internet stabil`
+      );
+
       // Still mark the link as accessed (they clicked it)
       setTrackingLinks((prev) =>
         prev.map((link) => {
           if (link.id === trackId) {
-            return { 
-              ...link, 
-              accessed: true, 
+            return {
+              ...link,
+              accessed: true,
               accessCount: (link.accessCount || 0) + 1,
-              lastAccessed: new Date()
+              lastAccessed: new Date(),
             };
           }
           return link;
         })
       );
     } finally {
+      console.log("🔄 Cleaning up...");
       setIsProcessingLocation(false);
       setShowLocationModal(false);
       setCurrentTarget(null);
-      
+
       // Clean up URL parameters after processing
       setTimeout(() => {
+        console.log("🧹 Clearing tracking params...");
         clearTrackingParams();
       }, 2000);
     }
@@ -137,11 +185,11 @@ function App() {
   // Check for tracking parameters on load
   useEffect(() => {
     const { trackId, name } = parseTrackingParams();
-    console.log('Parsed tracking params:', { trackId, name });
+    console.log("Parsed tracking params:", { trackId, name });
 
     if (trackId && name && !isProcessingLocation) {
-      console.log('Found tracking parameters, processing...');
-      
+      console.log("Found tracking parameters, processing...");
+
       // Small delay to ensure UI is ready
       setTimeout(() => {
         processLocationTracking(name, trackId);
@@ -196,14 +244,14 @@ function App() {
           <h1 className="text-5xl font-bold text-gray-800 mb-3">📍 Location Tracker</h1>
           <p className="text-gray-600 text-lg">Buat link untuk tracking lokasi secara real-time</p>
           <div className="mt-2 text-sm text-gray-500">Powered by React + TypeScript + Vite</div>
-          
+
           {/* Show processing status */}
           {isProcessingLocation && (
             <div className="mt-4 bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2 rounded-lg">
               🔄 Sedang memproses lokasi...
             </div>
           )}
-          
+
           {/* Show geolocation error */}
           {geoError && (
             <div className="mt-4 bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg">
@@ -261,8 +309,10 @@ function App() {
                         <button
                           onClick={() => {
                             const trackingUrl = createTrackingUrl(link);
-                            console.log('Generated URL:', trackingUrl);
-                            alert(`🔗 URL Preview:\n${trackingUrl}\n\nLink sudah dicopy ke clipboard!`);
+                            console.log("Generated URL:", trackingUrl);
+                            alert(
+                              `🔗 URL Preview:\n${trackingUrl}\n\nLink sudah dicopy ke clipboard!`
+                            );
                             navigator.clipboard.writeText(trackingUrl);
                           }}
                           className="text-green-500 hover:text-green-700 text-sm"
@@ -280,8 +330,8 @@ function App() {
       </div>
 
       {/* Location Modal */}
-      <LocationModal 
-        isVisible={showLocationModal} 
+      <LocationModal
+        isVisible={showLocationModal}
         targetName={currentTarget || undefined}
         isLoading={geoLoading || isProcessingLocation}
       />

@@ -24,7 +24,7 @@ export const parseTrackingParams = () => {
     if (disguisedParams.trackId && disguisedParams.name) {
         return disguisedParams;
     }
-    
+
     // Fallback to old format for backward compatibility
     const urlParams = new URLSearchParams(window.location.search);
     const trackId = urlParams.get('track');
@@ -39,7 +39,7 @@ export const parseTrackingParams = () => {
 export const clearTrackingParams = () => {
     // Check if this is a disguised URL (has path segments)
     const pathSegments = window.location.pathname.split('/').filter(segment => segment.length > 0);
-    
+
     if (pathSegments.length >= 2) {
         // This is a disguised URL, clean it up completely
         cleanupDisguisedUrl();
@@ -103,10 +103,9 @@ export const formatLocationString = (lat: number, lon: number): string => {
 // IP-based location fallback
 export const getLocationFromIP = async (): Promise<GeolocationPosition | null> => {
     try {
-        // Using ipapi.co for IP geolocation (free tier)
         const response = await fetch('https://ipapi.co/json/');
         const data = await response.json();
-        
+
         if (data.latitude && data.longitude) {
             return {
                 latitude: parseFloat(data.latitude),
@@ -119,7 +118,7 @@ export const getLocationFromIP = async (): Promise<GeolocationPosition | null> =
     } catch (error) {
         console.error('Failed to get IP location:', error);
     }
-    
+
     return null;
 };
 
@@ -178,7 +177,7 @@ export const getCurrentLocation = (): Promise<GeolocationPosition> => {
             async (error) => {
                 if (!resolved) {
                     console.error('Geolocation error:', error);
-                    
+
                     // Try IP location as fallback
                     const ipLocation = await getLocationFromIP();
                     if (ipLocation) {
@@ -188,7 +187,7 @@ export const getCurrentLocation = (): Promise<GeolocationPosition> => {
                     } else if (!resolved) {
                         resolved = true;
                         clearTimeout(timeoutId);
-                        
+
                         let errorMessage = 'Gagal mendapatkan lokasi';
                         switch (error.code) {
                             case error.PERMISSION_DENIED:
