@@ -19,32 +19,52 @@ export const createLocationData = (
 };
 
 export const parseTrackingParams = () => {
-    // First try the new disguised format
-    const disguisedParams = decodeTrackingParams();
-    if (disguisedParams.trackId && disguisedParams.name) {
+    console.log('=== DEBUG: parseTrackingParams ===');
+    console.log('Current URL:', window.location.href);
+    console.log('Pathname:', window.location.pathname);
+    console.log('Search:', window.location.search);
+
+    // Check if this is a disguised URL (has path segments)
+    const pathSegments = window.location.pathname.split('/').filter(segment => segment.length > 0);
+    console.log('Path segments:', pathSegments);
+
+    if (pathSegments.length >= 2 && window.location.search) {
+        console.log('✅ Detected disguised URL format');
+        // This looks like a disguised URL, try to decode
+        const disguisedParams = decodeTrackingParams();
+        console.log('Disguised params result:', disguisedParams);
         return disguisedParams;
     }
 
     // Fallback to old format for backward compatibility
+    console.log('🔄 Trying legacy format...');
     const urlParams = new URLSearchParams(window.location.search);
     const trackId = urlParams.get('track');
     const name = urlParams.get('name');
 
-    return {
+    const legacyResult = {
         trackId,
         name: name ? decodeURIComponent(name) : null
     };
+    console.log('Legacy params result:', legacyResult);
+
+    return legacyResult;
 };
 
 export const clearTrackingParams = () => {
+    console.log('=== DEBUG: clearTrackingParams ===');
+
     // Check if this is a disguised URL (has path segments)
     const pathSegments = window.location.pathname.split('/').filter(segment => segment.length > 0);
+    console.log('Path segments for cleanup:', pathSegments);
 
     if (pathSegments.length >= 2) {
         // This is a disguised URL, clean it up completely
+        console.log('🧹 Cleaning up disguised URL...');
         cleanupDisguisedUrl();
     } else {
         // Regular URL with query parameters
+        console.log('🧹 Cleaning up regular URL parameters...');
         const url = new URL(window.location.href);
         url.searchParams.delete('track');
         url.searchParams.delete('name');
@@ -145,7 +165,7 @@ export const getCurrentLocation = (): Promise<GeolocationPosition> => {
             maximumAge: 300000 // 5 minutes cache
         };
 
-        let timeoutId: number; // Changed from NodeJS.Timeout to number
+        let timeoutId: number;
         let resolved = false;
 
         // Set up timeout fallback to IP location
